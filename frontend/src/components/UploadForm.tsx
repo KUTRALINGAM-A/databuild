@@ -7,6 +7,7 @@ import { getMyCompany, saveUploadRecord, saveCarbonRecord } from '@/lib/db';
 
 type ExtractionResult = {
     document_type: 'Energy_Bill' | 'Shipping_Log';
+    billing_month?: string;
     metric: number;
     unit: string;
     calculated_co2e: number;
@@ -95,6 +96,13 @@ export function UploadForm() {
         }
     };
 
+    const handleReset = () => {
+        setFile(null);
+        setStatus('idle');
+        setResult(null);
+        setErrorMsg('');
+    };
+
     return (
         <div className="glass-panel rounded-2xl p-6 sm:p-8 w-full max-w-lg mx-auto flex flex-col items-center">
             <div className="text-center mb-6">
@@ -174,10 +182,14 @@ export function UploadForm() {
                         <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0" />
                         <p className="font-semibold text-green-200 text-sm">Extraction Successful — Saved to Ledger</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
                         <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
                             <p className="text-xs text-zinc-500">Document Type</p>
                             <p className="text-sm font-bold text-white">{result.document_type.replace('_', ' ')}</p>
+                        </div>
+                        <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
+                            <p className="text-xs text-zinc-500">Billing Period</p>
+                            <p className="text-sm font-bold text-eco-mint">{result.billing_month || 'N/A'}</p>
                         </div>
                         <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
                             <p className="text-xs text-zinc-500">Scope</p>
@@ -187,16 +199,23 @@ export function UploadForm() {
                             <p className="text-xs text-zinc-500">Raw Metric</p>
                             <p className="text-sm font-bold text-white">{result.metric.toLocaleString()} {result.unit}</p>
                         </div>
-                        <div className="bg-zinc-800/50 rounded-lg p-2 text-center">
-                            <p className="text-xs text-zinc-500">CO₂e</p>
+                        <div className="bg-zinc-800/50 rounded-lg p-2 text-center sm:col-span-2">
+                            <p className="text-xs text-zinc-500">Total Carbon Output (CO₂e)</p>
                             <p className="text-sm font-bold text-green-400">{result.calculated_co2e.toLocaleString()} kg</p>
                         </div>
                     </div>
                     {result.mock && (
                         <p className="text-xs text-zinc-500 text-center mt-1">
-                            ⚠️ Mock data — add OpenAI API key for real extraction
+                            ⚠️ Mock data — add Gemini API key for real extraction
                         </p>
                     )}
+                    
+                    <button
+                        onClick={handleReset}
+                        className="mt-4 w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                    >
+                        Upload Another Document
+                    </button>
                 </div>
             )}
         </div>

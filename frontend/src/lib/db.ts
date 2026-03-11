@@ -89,7 +89,6 @@ export async function getMyCompany(): Promise<CompanyRow | null> {
         .from('Companies_and_Vendors')
         .select('*')
         .eq('user_id', user.id)
-        .eq('role', 'Enterprise')
         .maybeSingle();
 
     if (error) { console.error('getMyCompany error:', error); return null; }
@@ -358,4 +357,61 @@ export async function getGreenAlternatives(productId: string, excludeSupplierId:
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const companies: CompanyRow[] = (data ?? []).map((r: any) => r['Companies_and_Vendors']).filter(Boolean);
     return companies.filter((c: CompanyRow) => c.status === 'Green');
+}
+
+// ─── MARKETPLACE TRANSACTIONS ───────────────────────────────────────────────
+
+export type MarketplaceCredit = {
+    id: string;
+    company_id: string;
+    supplier_name: string;
+    credit_type: string;
+    tonnes_offset: number;
+    cost_inr: number;
+    certificate_url: string;
+    purchased_at: string;
+};
+
+export async function getMarketplaceCredits(): Promise<MarketplaceCredit[]> {
+    try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/api/credits`);
+        
+        if (!res.ok) {
+            throw new Error(`Failed to fetch credits: ${res.statusText}`);
+        }
+        
+        const json = await res.json();
+        return json.data || [];
+    } catch (err) {
+        console.error("Error in getMarketplaceCredits:", err);
+        return [];
+    }
+}
+
+export async function purchaseCredit(creditId: string, buyerCompanyId: string, tonnesToBuy: number): Promise<boolean> {
+    try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/api/credits/buy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                credit_id: creditId,
+                buyer_company_id: buyerCompanyId,
+                tonnes_to_buy: tonnesToBuy,
+            })
+        });
+        
+        if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.detail || 'Failed to purchase credit');
+        }
+        
+        return true;
+    } catch (err) {
+        console.error("Error in purchaseCredit:", err);
+        return false;
+    }
 }

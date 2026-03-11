@@ -40,10 +40,11 @@ TIER2_SUPPLIERS = [
 ]
 
 GREEN_SMES = [
-    {"name": "EcoThread Cotton Mills", "industry": "Textiles", "employee_count": 120, "annual_revenue_cr": 45, "production_volume": 400, "production_unit": "Tonnes of Cloth", "industry_emission_factor": 1.25, "co2e_variance": -350}, # Highly negative (surplus credits)
-    {"name": "GreenLeaf Organic Farms", "industry": "Agriculture", "employee_count": 50, "annual_revenue_cr": 10, "production_volume": 200, "production_unit": "Tonnes of Produce", "industry_emission_factor": 0.5, "co2e_variance": -80},
-    {"name": "SolarPower Installers", "industry": "Energy", "employee_count": 85, "annual_revenue_cr": 25, "production_volume": 1500, "production_unit": "kW Installed", "industry_emission_factor": 0.1, "co2e_variance": -120},
-    {"name": "BioPak Packaging", "industry": "Manufacturing", "employee_count": 200, "annual_revenue_cr": 60, "production_volume": 2500, "production_unit": "Tonnes of BioPlastic", "industry_emission_factor": 0.32, "co2e_variance": -500},
+    # Production volumes scaled so each SME has 50-500 tonne CO2e surplus for a realistic marketplace
+    {"name": "EcoThread Cotton Mills", "industry": "Textiles", "employee_count": 120, "annual_revenue_cr": 45, "production_volume": 50000, "production_unit": "Tonnes of Cloth", "industry_emission_factor": 1.25, "co2e_variance": -350000},  # cap=62,500t; surplus≈350t
+    {"name": "GreenLeaf Organic Farms", "industry": "Agriculture", "employee_count": 50, "annual_revenue_cr": 10, "production_volume": 200000, "production_unit": "Tonnes of Produce", "industry_emission_factor": 0.5, "co2e_variance": -80000},   # cap=100,000t; surplus≈80t
+    {"name": "SolarPower Installers", "industry": "Energy", "employee_count": 85, "annual_revenue_cr": 25, "production_volume": 1500000, "production_unit": "kW Installed", "industry_emission_factor": 0.1, "co2e_variance": -120000},              # cap=150,000t; surplus≈120t
+    {"name": "BioPak Packaging", "industry": "Manufacturing", "employee_count": 200, "annual_revenue_cr": 60, "production_volume": 1500000, "production_unit": "Tonnes of BioPlastic", "industry_emission_factor": 0.32, "co2e_variance": -500000}, # cap=480,000t; surplus≈500t
 ]
 
 PRODUCTS = [
@@ -196,22 +197,36 @@ def seed():
 
     # 2. ADD SUPPLY RELATIONSHIPS
     print("\nAdding Supply Relationships...")
+    
+    # We want robust data: Every Giant should have at least 3 suppliers.
+    # At least two suppliers should provide the SAME product (e.g. Server Racks) so the user can test the "Smart Switch" feature
     relationships = [
-        # Giants -> Tier 1
+        # TechGlobal Systems' Suppliers (Notice: 2 suppliers for Server Racks)
         {"buyer": "TechGlobal Systems", "supplier": "CloudNine Servers AI", "product": "Server Racks"},
+        {"buyer": "TechGlobal Systems", "supplier": "SolarPower Installers", "product": "Server Racks"}, # Eco alternative!
         {"buyer": "TechGlobal Systems", "supplier": "PlastiPack Solutions", "product": "Plastic Casings"},
+        {"buyer": "TechGlobal Systems", "supplier": "Silicon Microchips", "product": "Microchips"},
+
+        # Apex Manufacturing's Suppliers (Notice: 2 suppliers for Plastic Casings)
         {"buyer": "Apex Manufacturing", "supplier": "SteelWorks India", "product": "Steel Beams"},
+        {"buyer": "Apex Manufacturing", "supplier": "PlastiPack Solutions", "product": "Plastic Casings"},
+        {"buyer": "Apex Manufacturing", "supplier": "BioPak Packaging", "product": "Plastic Casings"}, # Eco alternative!
+        {"buyer": "Apex Manufacturing", "supplier": "IronOre Miners Ltd", "product": "Iron Ore"},
+
+        # Nova Logistics Co's Suppliers (Notice: diesel and shipping overlap)
         {"buyer": "Nova Logistics Co", "supplier": "Global Fleet Transport", "product": "Freight Shipping"},
+        {"buyer": "Nova Logistics Co", "supplier": "Diesel Fuel Co", "product": "Diesel"},
+        {"buyer": "Nova Logistics Co", "supplier": "ChemSynthetics", "product": "Industrial Glue"},
         
-        # Tier 1 -> Tier 2
+        # Tier 1 chaining down to Tier 2 (to make the supply web deep)
         {"buyer": "CloudNine Servers AI", "supplier": "Silicon Microchips", "product": "Microchips"},
         {"buyer": "SteelWorks India", "supplier": "IronOre Miners Ltd", "product": "Iron Ore"},
         {"buyer": "Global Fleet Transport", "supplier": "Diesel Fuel Co", "product": "Diesel"},
         {"buyer": "PlastiPack Solutions", "supplier": "ChemSynthetics", "product": "Industrial Glue"},
         
-        # Green SMEs mixed in
-        {"buyer": "TechGlobal Systems", "supplier": "SolarPower Installers", "product": "Server Racks"}, # Eco alternative!
-        {"buyer": "Apex Manufacturing", "supplier": "BioPak Packaging", "product": "Plastic Casings"}, # Eco alternative!
+        # More Eco-SME overlaps
+        {"buyer": "SteelWorks India", "supplier": "EcoThread Cotton Mills", "product": "Server Racks"},
+        {"buyer": "Diesel Fuel Co", "supplier": "GreenLeaf Organic Farms", "product": "Diesel"},
     ]
 
     for rel in relationships:
@@ -237,29 +252,31 @@ def seed():
         red_giants = client.table("Companies_and_Vendors").select("*").eq("name", "TechGlobal Systems").execute().data
 
     for sme in sme_data:
-        surplus = sme["carbon_cap"] - sme["total_co2e"]
-        if surplus > 50:
-            # Create a certificate for the SME
-            print(f"  {sme['name']} generated {round(surplus)} tonnes of Carbon Credits!")
-            
-            # Sell a chunk of it to a Red company
-            buyer = random.choice(red_giants)
-            tonnes_sold = min(surplus * 0.8, buyer["total_co2e"] - buyer["carbon_cap"])
-            if tonnes_sold < 10: tonnes_sold = 50
-            
-            cost = tonnes_sold * random.uniform(1500, 3000) # INR per tonne
+        surplus_kg = sme["carbon_cap"] - sme["total_co2e"]   # surplus is in kg
+        surplus_tonnes = surplus_kg / 1000                    # convert to real tonnes
+        if surplus_tonnes < 0.05:
+            print(f"  {sme['name']} surplus too small ({round(surplus_kg)} kg), skipping.")
+            continue
+        
+        print(f"  {sme['name']} has {round(surplus_kg)} kg ({round(surplus_tonnes, 2)} tonnes) surplus → listing credits...")
+        
+        # Create 1-3 credit listings owned by the SME (1 credit = 1 tonne CO2e)
+        num_listings = random.randint(1, 3)
+        for _ in range(num_listings):
+            tonnes_listing = round(surplus_tonnes / num_listings * random.uniform(0.3, 0.7), 3)
+            if tonnes_listing < 0.01: tonnes_listing = 0.05  # minimum 0.05 tonnes (50 kg)
+            cost = tonnes_listing * random.uniform(500, 3000)  # ₹500-3000 per tonne (realistic CCTS rate)
             
             client.table("Carbon_Credits").insert({
-                "company_id": buyer["id"], # The buyer owns the retired credit
-                "credit_type": f"Verified Offset from {sme['name']} (EcoLedger Exchange)",
-                "tonnes_offset": round(tonnes_sold, 2),
+                "company_id": sme["id"],  # OWNED BY THE SME — available on the marketplace
+                "credit_type": f"Verified Surplus Credit — {sme['name']} (EcoLedger Exchange)",
+                "tonnes_offset": round(tonnes_listing, 3),   # stored in TONNES
                 "cost_inr": round(cost, 2),
                 "certificate_url": f"https://ecoledger.app/certificates/cert_{random.randint(10000,99999)}.pdf",
                 "purchased_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }).execute()
-            
-            print(f"    -> Sold {round(tonnes_sold)} tonnes to {buyer['name']} for INR {round(cost)}")
-            
+            print(f"    → Listed {round(tonnes_listing, 3)} tonnes CO₂e for ₹{round(cost):,}")
+    
     print("\nDatabase successfully seeded!")
 
 if __name__ == "__main__":

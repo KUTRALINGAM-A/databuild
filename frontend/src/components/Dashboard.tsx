@@ -42,12 +42,18 @@ export function Dashboard() {
     useEffect(() => { load(); }, []);
 
     // ── Computed metrics ──────────────────────────────────────────────────────
-    const totalCo2e = ledger.reduce((s, r) => s + r.calculated_co2e, 0);
-    const energyCo2e = ledger.filter(r => r.metric_unit === 'KWh').reduce((s, r) => s + r.raw_metric, 0);
+    const scope12Co2e = ledger.reduce((s, r) => s + r.calculated_co2e, 0);
     const scope3Co2e = vendors.reduce((s, v) => s + (v.total_co2e ?? 0), 0);
+    const grandTotalCo2e = scope12Co2e + scope3Co2e; // Total sum of all 3 scopes
+    
+    const energyCo2e = ledger.filter(r => r.metric_unit === 'KWh').reduce((s, r) => s + r.raw_metric, 0);
     const breachCount = vendors.filter(v => v.status === 'Red').length;
-    const carbonCap = company?.carbon_cap ?? 10000;
-    const capPercent = Math.min((totalCo2e / carbonCap) * 100, 100);
+    // Dynamic cap: always computed live from production_volume × industry_emission_factor
+    // Falls back to the stored carbon_cap if the fields aren't filled in yet
+    const dynamicCap = (company?.production_volume && company?.industry_emission_factor)
+        ? company.production_volume * company.industry_emission_factor
+        : (company?.carbon_cap ?? 10000);
+    const rawCapPercent = (grandTotalCo2e / dynamicCap) * 100;
 
     // Smart Switch alternatives pulled from industry averages
     const getAlternatives = (vendor: CompanyRow) => {
@@ -75,7 +81,7 @@ export function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-2xl font-bold text-eco-deepgreen">{company.name}</h2>
-                        <p className="text-eco-graphite/70 text-sm">{company.industry} · Carbon Cap: {carbonCap.toLocaleString()} kg CO₂e / year</p>
+                        <p className="text-eco-graphite/70 text-sm">{company.industry} · Carbon Cap: {dynamicCap.toLocaleString()} kg CO₂e / year</p>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
@@ -115,39 +121,45 @@ export function Dashboard() {
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 relative z-10 space-y-2 md:space-y-0">
                         <div>
                             <span className="text-sm font-bold text-eco-deepgreen block mb-1">Dynamic Carbon Cap Limit (PAT Scheme)</span>
-                            {company.production_volume ? (
+                            {company.production_volume && company.industry_emission_factor ? (
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-eco-graphite/70">
-                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">{company.production_volume.toLocaleString()} {company.production_unit}</span>
-                                    <span>×</span>
-                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">{company.industry_emission_factor} kg/unit (Benchmark)</span>
-                                    <span>=</span>
-                                    <span className="text-eco-deepgreen font-bold">{carbonCap.toLocaleString()} kg CO₂e Allowed</span>
+                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">
+                                        Volume: {company.production_volume.toLocaleString()} {company.production_unit}
+                                    </span>
+                                    <span className="text-eco-graphite/50">×</span>
+                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">
+                                        Factor: {company.industry_emission_factor} kg/unit
+                                    </span>
+                                    <span className="text-eco-graphite/50">=</span>
+                                    <span className="text-eco-deepgreen font-bold">
+                                        {dynamicCap.toLocaleString()} kg CO₂e Allowed
+                                    </span>
                                 </div>
                             ) : (
-                                <span className="text-xs text-eco-graphite/70">Fixed limit configuration</span>
+                                <span className="text-xs text-eco-graphite/70">Cap: {dynamicCap.toLocaleString()} kg CO₂e / year</span>
                             )}
                         </div>
                         <span className={cn("px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-md",
-                            capPercent >= 100 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                capPercent >= 80 ? 'bg-eco-ochre/20 text-eco-ochre border border-eco-ochre/30' :
+                            rawCapPercent >= 100 ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
+                                rawCapPercent >= 80 ? 'bg-eco-ochre/20 text-eco-ochre border border-eco-ochre/30' :
                                     'bg-eco-mint/20 text-eco-mint border border-eco-mint/30')}>
-                            {capPercent.toFixed(1)}% Capacity Used
+                            {rawCapPercent.toFixed(1)}% Capacity Used
                         </span>
                     </div>
 
-                    <div className="h-3 bg-white/60 rounded-full overflow-hidden border border-eco-graphite/10 shadow-inner relative z-10">
+                    <div className="h-4 bg-white/60 rounded-full overflow-hidden border border-eco-graphite/10 shadow-inner relative z-10 w-full flex items-center">
                         <div
                             className={cn("h-full rounded-full transition-all duration-1000 ease-out shadow-[inset_0_1px_2px_rgba(255,255,255,0.4)]",
-                                capPercent >= 100 ? "bg-gradient-to-r from-red-600 to-red-400" :
-                                    capPercent >= 80 ? "bg-gradient-to-r from-eco-ochre to-yellow-400" :
+                                rawCapPercent >= 100 ? "bg-gradient-to-r from-red-600 to-red-400" :
+                                    rawCapPercent >= 80 ? "bg-gradient-to-r from-eco-ochre to-yellow-400" :
                                         "bg-gradient-to-r from-eco-deepgreen to-eco-mint")}
-                            style={{ width: `${capPercent}%` }}
+                            style={{ width: `${Math.min(rawCapPercent, 100)}%` }}
                         />
                     </div>
                     <div className="flex justify-between text-[11px] font-medium text-eco-graphite/70 mt-2 relative z-10">
                         <span>0 kg</span>
-                        <span className={capPercent >= 100 ? "text-red-500 font-bold" : ""}>{totalCo2e.toLocaleString()} kg Emitted</span>
-                        <span>{carbonCap.toLocaleString()} kg Limit</span>
+                        <span className={rawCapPercent >= 100 ? "text-red-500 font-bold" : ""}>{grandTotalCo2e.toLocaleString()} kg Emitted (Scope 1+2+3)</span>
+                        <span>{dynamicCap.toLocaleString()} kg Limit</span>
                     </div>
                 </div>
             )}
@@ -160,7 +172,7 @@ export function Dashboard() {
                     </div>
                     <p className="text-eco-graphite/60 font-medium mb-1 relative z-10">My Footprint (Scope 1+2)</p>
                     <h3 className="text-4xl font-bold text-eco-deepgreen relative z-10">
-                        {totalCo2e > 0 ? totalCo2e.toLocaleString() : '—'}
+                        {scope12Co2e > 0 ? scope12Co2e.toLocaleString() : '—'}
                         <span className="text-lg text-eco-graphite/60 font-medium"> kg CO₂e</span>
                     </h3>
                     <div className="mt-4 flex items-center space-x-2 text-sm text-eco-mint bg-eco-mint/10 w-max px-3 py-1 rounded-full border border-eco-mint/20 relative z-10">

@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { UploadForm } from '@/components/UploadForm';
 import { Dashboard } from '@/components/Dashboard';
 import { AuthPage } from '@/pages/AuthPage';
+import { MarketplacePage } from '@/pages/MarketplacePage';
 import { supabase } from '@/lib/supabase';
 import { LogOut } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'marketplace'>('dashboard');
 
   useEffect(() => {
     // Get current session on mount
@@ -75,6 +76,15 @@ export default function App() {
             >
               Data Portal
             </button>
+            <button
+              onClick={() => setActiveTab('marketplace')}
+              className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all duration-300 ${activeTab === 'marketplace'
+                ? 'bg-white text-eco-deepgreen shadow-sm border border-eco-graphite/5'
+                : 'text-eco-graphite/60 hover:text-eco-deepgreen'
+                }`}
+            >
+              Marketplace
+            </button>
           </nav>
 
           {/* Sign out */}
@@ -95,6 +105,9 @@ export default function App() {
         </div>
         <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
           <UploadForm />
+        </div>
+        <div style={{ display: activeTab === 'marketplace' ? 'block' : 'none' }}>
+          <MarketplacePage />
         </div>
       </main>
     </div>
