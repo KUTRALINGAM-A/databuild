@@ -235,13 +235,19 @@ export async function getMyVendors(optionalCompanyId?: string): Promise<CompanyR
         companyId = company.id;
     }
 
+    // Query Supply_Relationships where this company is the buyer
     const { data, error } = await supabase
-        .from('Companies_and_Vendors')
-        .select('*')
-        .eq('role', 'Supplier');
+        .from('Supply_Relationships')
+        .select('supplier_company_id, Companies_and_Vendors!supplier_company_id(*)')
+        .eq('buyer_company_id', companyId)
+        .eq('is_active', true);
 
     if (error) { console.error('getMyVendors error:', error); return []; }
-    return data ?? [];
+    
+    // Extract the actual company rows from the join
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vendors = (data ?? []).map((r: any) => r['Companies_and_Vendors']).filter(Boolean);
+    return vendors;
 }
 
 /** Get industry averages for Smart Switch. */
