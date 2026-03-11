@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { UploadCloud, CheckCircle2, FileText, AlertCircle } from 'lucide-react';
+import { UploadCloud, CheckCircle2, FileText, AlertCircle, Building2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
-import { getMyCompany, saveUploadRecord, saveCarbonRecord } from '@/lib/db';
+import { getMyCompany, saveUploadRecord, saveCarbonRecord, updateCompanyMetrics } from '@/lib/db';
 
 type ExtractionResult = {
     document_type: 'Energy_Bill' | 'Shipping_Log';
@@ -22,6 +22,16 @@ export function UploadForm() {
     const [status, setStatus] = useState<'idle' | 'uploading' | 'saving' | 'success' | 'error'>('idle');
     const [result, setResult] = useState<ExtractionResult | null>(null);
     const [errorMsg, setErrorMsg] = useState('');
+    const [selectedIndustry, setSelectedIndustry] = useState('General');
+    const [savingIndustry, setSavingIndustry] = useState(false);
+
+    const industries = ["General", "Cement", "Steel", "Tech", "Logistics", "Manufacturing"];
+
+    useEffect(() => {
+        getMyCompany().then(co => {
+            if (co?.industry) setSelectedIndustry(co.industry);
+        });
+    }, []);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -103,15 +113,60 @@ export function UploadForm() {
         setErrorMsg('');
     };
 
+    const handleUpdateIndustry = async (ind: string) => {
+        try {
+            setSavingIndustry(true);
+            setSelectedIndustry(ind);
+            await updateCompanyMetrics({ industry: ind });
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setSavingIndustry(false);
+        }
+    };
+
     return (
         <div className="glass-panel rounded-2xl p-6 sm:p-8 w-full max-w-lg mx-auto flex flex-col items-center">
-            <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600 mb-2">
+            <div className="text-center mb-8">
+                <h2 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600 mb-2 uppercase tracking-tight">
                     Universal Data Portal
                 </h2>
                 <p className="text-zinc-400 text-sm">
-                    Upload energy bills or shipping logs. Our AI automatically extracts consumption data and converts it to standardized CO₂e.
+                    Upload documents or configure your industry to generate AI strategies.
                 </p>
+            </div>
+
+            {/* Industry Selector - NEW */}
+            <div className="w-full mb-8 p-5 bg-white/5 border border-white/10 rounded-2xl">
+                <div className="flex items-center gap-2 mb-4">
+                    <Building2 className="w-4 h-4 text-eco-mint" />
+                    <span className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Identify Your Industry</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    {industries.map((ind) => (
+                        <button
+                            key={ind}
+                            onClick={() => handleUpdateIndustry(ind)}
+                            className={cn(
+                                "px-3 py-2 rounded-xl text-xs font-bold transition-all border",
+                                selectedIndustry === ind 
+                                    ? "bg-eco-mint text-zinc-900 border-eco-mint shadow-[0_0_15px_rgba(64,145,108,0.3)]" 
+                                    : "bg-zinc-800/50 text-zinc-400 border-zinc-700 hover:border-zinc-600"
+                            )}
+                        >
+                            {ind}
+                        </button>
+                    ))}
+                </div>
+                {savingIndustry && (
+                    <p className="text-[10px] text-eco-mint mt-2 animate-pulse font-medium italic">Syncing profile with AI engine...</p>
+                )}
+            </div>
+
+            <div className="flex items-center gap-3 w-full mb-4 px-2">
+                <div className="h-[1px] flex-grow bg-white/10" />
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Scan Documents</span>
+                <div className="h-[1px] flex-grow bg-white/10" />
             </div>
 
             <div

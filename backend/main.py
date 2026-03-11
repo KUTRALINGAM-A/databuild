@@ -428,3 +428,166 @@ async def buy_carbon_credit(req: BuyCreditRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/strategy/action-plan")
+async def get_action_plan(company_id: str):
+    if not sb_client:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized")
+    try:
+        # 1. Fetch Company Data for Dynamic Cap
+        company_res = sb_client.table("Companies_and_Vendors").select("*").eq("id", company_id).single().execute()
+        if not company_res.data:
+            raise HTTPException(status_code=404, detail="Company not found")
+        
+        company = company_res.data
+        name = company.get("name")
+        industry = company.get("industry")
+        
+        # ─── SYNC WITH DASHBOARD LOGIC ─────────────────────────────────────────
+        # Dashboard Cap: (Volume * Factor) or hardcoded carbon_cap
+        volume = company.get("production_volume") or 0
+        factor = company.get("industry_emission_factor") or 0
+        dynamic_cap_kg = (volume * factor) if (volume > 0 and factor > 0) else (company.get("carbon_cap") or 10000)
+        
+        # Dashboard Footprint (Scope 1+2): Sum of entire Carbon_Ledger
+        ledger_res = sb_client.table("Carbon_Ledger").select("calculated_co2e, scope_type").eq("company_id", company_id).execute()
+        ledger_total_kg = sum(r["calculated_co2e"] for r in ledger_res.data) if ledger_res.data else 0
+        
+        # Dashboard Scope 3: Sum of deduplicated vendors (One vendor per product)
+        # 1. Get relationships
+        rels_res = sb_client.table("Supply_Relationships").select("supplier_company_id, product_id").eq("buyer_company_id", company_id).eq("is_active", True).execute()
+        all_rels = rels_res.data or []
+        
+        # 2. Replicate Dashboard Deduplication (simplified version of the /api/vendors logic)
+        best_per_product = {}
+        s_ids = [r["supplier_company_id"] for r in all_rels]
+        if s_ids:
+            v_res = sb_client.table("Companies_and_Vendors").select("id, status, total_co2e").in_("id", s_ids).execute()
+            v_map = {v["id"]: v for v in v_res.data}
+            
+            for rel in all_rels:
+                pid = rel["product_id"]
+                sid = rel["supplier_company_id"]
+                vendor = v_map.get(sid)
+                if not vendor: continue
+                
+                existing = best_per_product.get(pid)
+                if not existing:
+                    best_per_product[pid] = vendor
+                else:
+                    # Preference: Red first, then higher emissions (breaching priority)
+                    s_new = (1 if vendor["status"] == "Red" else 0, vendor["total_co2e"] or 0)
+                    s_old = (1 if existing["status"] == "Red" else 0, existing["total_co2e"] or 0)
+                    if s_new > s_old:
+                        best_per_product[pid] = vendor
+        
+        scope_3_kg = sum(v["total_co2e"] or 0 for v in best_per_product.values())
+        
+        grand_total_kg = ledger_total_kg + scope_3_kg
+        deficit_kg = max(0, grand_total_kg - dynamic_cap_kg)
+        deficit_tonnes = deficit_kg / 1000
+        
+        # Split scopes for the AI breakdown
+        scope_1_kg = sum(r["calculated_co2e"] for r in ledger_res.data if r["scope_type"] == 1) if ledger_res.data else 0
+        scope_2_kg = sum(r["calculated_co2e"] for r in ledger_res.data if r["scope_type"] == 2) if ledger_res.data else 0
+        # ───────────────────────────────────────────────────────────────────────
+
+
+        # AI PROMPT: Ask Gemini to generate 3 tailored strategies
+        strategies_json = []
+
+        if GEMINI_API_KEY:
+            try:
+                model = genai.GenerativeModel('gemini-2.0-flash', generation_config={"response_mime_type": "application/json"})
+                prompt = f"""
+                Company Profile: {name} ({industry})
+                Annual Emissions: {grand_total_kg/1000:.1f} Tonnes (Goal is {dynamic_cap_kg/1000:.1f} Tonnes)
+                Breakdown:
+                - Scope 1 (Direct Fuels/Fleet): {scope_1_kg/1000:.1f} T
+                - Scope 2 (Electricity): {scope_2_kg/1000:.1f} T
+                - Scope 3 (Supply Chain): {scope_3_kg/1000:.1f} T
+
+                Task: Generate 3 realistic decarbonization strategies for this company.
+                - Option A: Must be 'Carbon Credit Purchase' (the quick fix).
+                - Option B: Must focus on the HIGHEST Scope emission (1, 2, or 3).
+                - Option C: Must be a long-term investment or innovative tech for their industry.
+
+                Return JSON only:
+                {{
+                    "options": [
+                        {{
+                            "id": "A", "title": "string", "subtitle": "string", "description": "string",
+                            "financial_cost": float, "time_to_compliance": "string", "difficulty": "Low|Medium|High",
+                            "roi": "string", "tonnes_saved": float
+                        }},
+                        ... (repeat for B and C)
+                    ]
+                }}
+                Use realistic Indian market prices (₹) and ROI timelines.
+                """
+                response = model.generate_content(prompt)
+                import json
+                strategies_json = json.loads(response.text).get("options", [])
+            except Exception as ai_err:
+                print(f"AI Strategy Generation Failed, using fallback: {ai_err}")
+
+        # HEURISTIC FALLBACK (If AI fails or No Key)
+        if not strategies_json:
+            highest_scope = 3 if scope_3_kg >= max(scope_1_kg, scope_2_kg) else (2 if scope_2_kg >= scope_1_kg else 1)
+            
+            # 1. Option B logic based on highest scope
+            if highest_scope == 3:
+                b_title, b_sub, b_desc = "Supply Chain Smart Switch", "Scope 3 Action", f"Shift {name}'s procurement to verified green alternatives for high-impact categories."
+            elif highest_scope == 2:
+                b_title, b_sub, b_desc = "Solar Microgrid PPA", "Scope 2 Action", "Install site-specific solar or wind assets to remove electricity volatility."
+            else:
+                b_title, b_sub, b_desc = "EV Fleet Transition", "Scope 1 Action", f"Replace {name}'s internal combustion logistics with an all-electric EV fleet."
+
+            # 2. Industry-Specific Option C logic
+            industry_tech = {
+                "Cement": {"title": "Waste Heat Recovery System", "desc": "Capture thermal energy from kilns to generate carbon-free power for the plant."},
+                "Steel": {"title": "Green Hydrogen Injection", "desc": "Replace coking coal with hydrogen-based reduction to eliminate direct process CO2."},
+                "Tech": {"title": "Renewable Cooling Architecture", "desc": "Implement liquid immersion cooling powered by 100% renewable energy for data nodes."},
+                "Logistics": {"title": "AI Route Optimization", "desc": "Deploy machine learning to cut idle time and fuel consumption across all routes by 18%."}
+            }
+            default_tech = {"title": "AI Process Optimization", "desc": "Deploy deep-learning sensors to cut industry-specific energy waste by 12%."}
+            c_strategy = industry_tech.get(industry, default_tech)
+
+            strategies_json = [
+                {
+                    "id": "A", "title": "Verified Carbon Credits", "subtitle": "The Quick Fix",
+                    "description": f"Bridge the {deficit_tonnes:.1f}T gap immediately with Gold Standard Indian offsets.",
+                    "financial_cost": deficit_tonnes * 1250, "time_to_compliance": "Instant", "difficulty": "Low",
+                    "roi": "Compliance Only", "tonnes_saved": deficit_tonnes
+                },
+                {
+                    "id": "B", "title": b_title, "subtitle": b_sub, "description": b_desc,
+                    "financial_cost": deficit_tonnes * 2100, "time_to_compliance": "6-9 Months", "difficulty": "Medium",
+                    "roi": "OpEx Savings", "tonnes_saved": deficit_tonnes * 0.65
+                },
+                {
+                    "id": "C", "title": c_strategy["title"], "subtitle": "Long-term Investment",
+                    "description": c_strategy["desc"],
+                    "financial_cost": 2500000 if industry != "Tech" else 800000, 
+                    "time_to_compliance": "12-24 Months", "difficulty": "High",
+                    "roi": "3-5 Year Payback", "tonnes_saved": grand_total_kg * 0.20 / 1000
+                }
+            ]
+
+        return {
+            "status": "success",
+            "data": {
+                "summary": {
+                    "total_co2e": grand_total_kg,
+                    "carbon_cap": dynamic_cap_kg,
+                    "deficit_tonnes": deficit_tonnes,
+                    "status": "Red" if grand_total_kg > dynamic_cap_kg else "Green"
+                },
+                "options": strategies_json
+            }
+        }
+    except Exception as e:
+        print(f"Action Plan Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+

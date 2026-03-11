@@ -138,6 +138,7 @@ export async function updateCompanyMetrics(params: {
     annual_revenue_cr?: number;
     production_volume?: number;
     production_unit?: string;
+    industry?: string;
     industry_emission_factor?: number;
 }): Promise<CompanyRow | null> {
     const { data: { user } } = await supabase.auth.getUser();

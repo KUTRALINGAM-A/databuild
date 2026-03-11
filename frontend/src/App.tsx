@@ -3,13 +3,14 @@ import { UploadForm } from '@/components/UploadForm';
 import { Dashboard } from '@/components/Dashboard';
 import { AuthPage } from '@/pages/AuthPage';
 import { MarketplacePage } from '@/pages/MarketplacePage';
+import { ActionPlan } from '@/components/ActionPlan'; // Added this import
 import { supabase } from '@/lib/supabase';
 import { LogOut } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'marketplace'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'upload' | 'marketplace' | 'action-plan'>('dashboard'); // Modified this line
 
   useEffect(() => {
     // Get current session on mount
@@ -85,6 +86,15 @@ export default function App() {
             >
               Marketplace
             </button>
+            <button
+              onClick={() => setActiveTab('action-plan')}
+              className={`px-6 py-1.5 rounded-full text-sm font-bold transition-all duration-300 ${activeTab === 'action-plan'
+                ? 'bg-white text-eco-deepgreen shadow-sm border border-eco-graphite/5'
+                : 'text-eco-graphite/60 hover:text-eco-deepgreen'
+                }`}
+            >
+              Action Plan
+            </button>
           </nav>
 
           {/* Sign out */}
@@ -108,6 +118,9 @@ export default function App() {
         </div>
         <div style={{ display: activeTab === 'marketplace' ? 'block' : 'none' }}>
           <MarketplacePage />
+        </div>
+        <div style={{ display: activeTab === 'action-plan' ? 'block' : 'none' }}>
+          <ActionPlan />
         </div>
       </main>
     </div>
