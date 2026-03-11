@@ -235,12 +235,12 @@ export async function getMyVendors(optionalCompanyId?: string): Promise<CompanyR
         companyId = company.id;
     }
 
-    // Correct Supabase Join syntax for foreign keys
+    // Correct Supabase Join syntax for disambiguating multiple foreign keys
     const { data, error } = await supabase
         .from('Supply_Relationships')
         .select(`
             supplier_company_id,
-            Companies_and_Vendors:supplier_company_id (*)
+            Companies_and_Vendors!supplier_company_id (*)
         `)
         .eq('buyer_company_id', companyId)
         .eq('is_active', true);
