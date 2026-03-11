@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw, FileText } from 'lucide-react';
+import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw, FileText, Network, Box } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getMyCompany, getMyCarbonLedger, getMyVendors, getIndustryAverages } from '@/lib/db';
 import type { CompanyRow, CarbonLedgerRow, IndustryAverageRow } from '@/lib/db';
@@ -78,12 +78,26 @@ export function Dashboard() {
                         <p className="text-eco-graphite/70 text-sm">{company.industry} · Carbon Cap: {carbonCap.toLocaleString()} kg CO₂e / year</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => navigate('/newform')} 
+                        <button
+                            onClick={() => navigate('/newform')}
                             className="flex items-center gap-2 px-4 py-2 bg-eco-deepgreen text-white text-sm font-bold rounded-xl shadow-md hover:bg-eco-teal transition-all"
                         >
                             <FileText className="w-4 h-4" />
                             Enter Carbon Data
+                        </button>
+                        <button
+                            onClick={() => navigate('/supply-relationships')}
+                            className="flex items-center gap-2 px-4 py-2 bg-eco-teal text-white text-sm font-bold rounded-xl shadow-md hover:bg-eco-deepgreen transition-all"
+                        >
+                            <Network className="w-4 h-4" />
+                            Enter Supply Relationships
+                        </button>
+                        <button
+                            onClick={() => navigate('/products')}
+                            className="flex items-center gap-2 px-4 py-2 bg-eco-teal text-white text-sm font-bold rounded-xl shadow-md hover:bg-eco-deepgreen transition-all"
+                        >
+                            <Box className="w-4 h-4" />
+                            Add Product
                         </button>
                         <button onClick={load} className="p-2 rounded-xl border border-eco-graphite/20 text-eco-graphite/60 hover:text-eco-deepgreen hover:bg-white/50 transition bg-white/30">
                             <RefreshCw className="w-4 h-4" />
