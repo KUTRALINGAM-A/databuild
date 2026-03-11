@@ -50,6 +50,15 @@ export default {
                     DEFAULT: "hsl(var(--card))",
                     foreground: "hsl(var(--card-foreground))",
                 },
+                // ── EcoLedger Brand Palette ──────────────────────
+                eco: {
+                    deepgreen: "#1B4332",  // Primary Nav / Headers
+                    mint: "#40916C",  // Active States / CTAs
+                    teal: "#2D6A4F",  // Graphs / Highlights
+                    graphite: "#2D3142",  // Body Text / Data
+                    ochre: "#D9A06F",  // Alerts / Secondary CTAs
+                    basegray: "#F0F2F5",  // Background / Containers
+                },
             },
             borderRadius: {
                 lg: "var(--radius)",
