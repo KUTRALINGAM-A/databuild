@@ -122,6 +122,9 @@ export function AuthPage() {
     const [company, setCompany] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [role, setRole] = useState('Enterprise');
+    const [industry, setIndustry] = useState('General');
+    const [status, setStatus] = useState('Green');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -134,11 +137,19 @@ export function AuthPage() {
                 const { error: err } = await supabase.auth.signUp({
                     email,
                     password,
-                    options: { data: { company_name: company } },
+                    options: { data: { company_name: company, role, industry, status } },
                 });
                 if (err) throw err;
                 // Immediately create the company row in Companies_and_Vendors
-                await createCompany({ name: company || email.split('@')[0], industry: 'General', carbonCap: 10000 });
+                await createCompany({ 
+                    id: crypto.randomUUID(),
+                    name: company || email.split('@')[0], 
+                    role,
+                    industry, 
+                    status,
+                    total_co2e: 0,
+                    carbonCap: 10000 
+                });
                 setSuccess('Account created! Signing you in…');
             } else {
                 const { error: err } = await supabase.auth.signInWithPassword({ email, password });
@@ -273,12 +284,40 @@ export function AuthPage() {
                         {/* Form */}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             {mode === 'signup' && (
-                                <div className="relative">
-                                    <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input type="text" required placeholder="Company Name (e.g., Tata Steel Ltd)"
-                                        value={company} onChange={e => setCompany(e.target.value)}
-                                        className={inputClass} />
-                                </div>
+                                <>
+                                    <div className="relative">
+                                        <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input type="text" required placeholder="Company Name (e.g., Tata Steel Ltd)"
+                                            value={company} onChange={e => setCompany(e.target.value)}
+                                            className={inputClass} />
+                                    </div>
+                                    <div className="relative">
+                                        <select required value={role} onChange={e => setRole(e.target.value)}
+                                            className={inputClass} style={{ paddingLeft: '1rem' }}>
+                                            <option value="" disabled>Select Role</option>
+                                            <option value="Enterprise">Enterprise</option>
+                                            <option value="Supplier">Supplier</option>
+                                        </select>
+                                    </div>
+                                    <div className="relative">
+                                        <select required value={industry} onChange={e => setIndustry(e.target.value)}
+                                            className={inputClass} style={{ paddingLeft: '1rem' }}>
+                                            <option value="" disabled>Select Industry</option>
+                                            <option value="Manufacturing">Manufacturing</option>
+                                            <option value="Steel & Metals">Steel & Metals</option>
+                                            <option value="Technology">Technology</option>
+                                            <option value="General">General / Other</option>
+                                        </select>
+                                    </div>
+                                    <div className="relative">
+                                        <select required value={status} onChange={e => setStatus(e.target.value)}
+                                            className={inputClass} style={{ paddingLeft: '1rem' }}>
+                                            <option value="" disabled>Account Status</option>
+                                            <option value="Green">Green</option>
+                                            <option value="Red">Red</option>
+                                        </select>
+                                    </div>
+                                </>
                             )}
                             <div className="relative">
                                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

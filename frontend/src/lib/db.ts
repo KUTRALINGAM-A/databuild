@@ -98,8 +98,12 @@ export async function getMyCompany(): Promise<CompanyRow | null> {
 
 /** Create a company row after signup. */
 export async function createCompany(params: {
+    id?: string;
     name: string;
+    role?: string;
     industry?: string;
+    status?: string;
+    total_co2e?: number;
     carbonCap?: number;
 }): Promise<CompanyRow | null> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -108,18 +112,44 @@ export async function createCompany(params: {
     const { data, error } = await supabase
         .from('Companies_and_Vendors')
         .insert({
+            id: params.id ?? crypto.randomUUID(),
             name: params.name,
-            role: 'Enterprise',
+            role: params.role ?? 'Enterprise',
             industry: params.industry ?? 'General',
             carbon_cap: params.carbonCap ?? 10000,
-            total_co2e: 0,
-            status: 'Green',
+            total_co2e: params.total_co2e ?? 0,
+            status: params.status ?? 'Green',
             user_id: user.id,
         })
         .select()
         .single();
 
     if (error) { console.error('createCompany error:', error); return null; }
+    return data;
+}
+
+/** Update the current user's company with advanced metrics (baseline, targets, etc.) */
+export async function updateCompanyMetrics(params: {
+    baseline_co2e?: number;
+    target_co2e?: number;
+    target_year?: number;
+    employee_count?: number;
+    annual_revenue_cr?: number;
+    production_volume?: number;
+    production_unit?: string;
+    industry_emission_factor?: number;
+}): Promise<CompanyRow | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+        .from('Companies_and_Vendors')
+        .update(params)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+    if (error) { console.error('updateCompanyMetrics error:', error); return null; }
     return data;
 }
 

@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw } from 'lucide-react';
+import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getMyCompany, getMyCarbonLedger, getMyVendors, getIndustryAverages } from '@/lib/db';
 import type { CompanyRow, CarbonLedgerRow, IndustryAverageRow } from '@/lib/db';
+import { useNavigate } from 'react-router-dom';
 
 
 export function Dashboard() {
+    const navigate = useNavigate();
     const [company, setCompany] = useState<CompanyRow | null>(null);
     const [ledger, setLedger] = useState<CarbonLedgerRow[]>([]);
     const [vendors, setVendors] = useState<CompanyRow[]>([]);
@@ -70,14 +72,23 @@ export function Dashboard() {
 
             {/* Company banner */}
             {company && (
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-2xl font-bold text-eco-deepgreen">{company.name}</h2>
                         <p className="text-eco-graphite/70 text-sm">{company.industry} · Carbon Cap: {carbonCap.toLocaleString()} kg CO₂e / year</p>
                     </div>
-                    <button onClick={load} className="p-2 rounded-full border border-eco-graphite/20 text-eco-graphite/60 hover:text-eco-deepgreen hover:bg-white transition bg-white/50">
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => navigate('/newform')} 
+                            className="flex items-center gap-2 px-4 py-2 bg-eco-deepgreen text-white text-sm font-bold rounded-xl shadow-md hover:bg-eco-teal transition-all"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Enter Carbon Data
+                        </button>
+                        <button onClick={load} className="p-2 rounded-xl border border-eco-graphite/20 text-eco-graphite/60 hover:text-eco-deepgreen hover:bg-white/50 transition bg-white/30">
+                            <RefreshCw className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             )}
 
