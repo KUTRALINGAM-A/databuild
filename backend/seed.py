@@ -260,12 +260,14 @@ def seed():
         
         print(f"  {sme['name']} has {round(surplus_kg)} kg ({round(surplus_tonnes, 2)} tonnes) surplus → listing credits...")
         
-        # Create 1-3 credit listings owned by the SME (1 credit = 1 tonne CO2e)
+        # Create 1-3 credit listings owned by the SME at a UNIFORM rate
         num_listings = random.randint(1, 3)
+        sme_rate_per_tonne = random.uniform(500, 3000) # Flat rate for this supplier
+        
         for _ in range(num_listings):
-            tonnes_listing = round(surplus_tonnes / num_listings * random.uniform(0.3, 0.7), 3)
+            tonnes_listing = round((surplus_tonnes / num_listings) * random.uniform(0.3, 0.7), 3)
             if tonnes_listing < 0.01: tonnes_listing = 0.05  # minimum 0.05 tonnes (50 kg)
-            cost = tonnes_listing * random.uniform(500, 3000)  # ₹500-3000 per tonne (realistic CCTS rate)
+            cost = tonnes_listing * sme_rate_per_tonne
             
             client.table("Carbon_Credits").insert({
                 "company_id": sme["id"],  # OWNED BY THE SME — available on the marketplace
