@@ -1,4 +1,4 @@
-﻿import os
+import os
 import io
 import base64
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -138,3 +138,21 @@ Instructions:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/vendors")
+async def get_vendors(buyer_id: str):
+    if not sb_client:
+        raise HTTPException(status_code=500, detail="Supabase client not initialized")
+    
+    try:
+        # Step 1: Get supplier IDs
+        rels = sb_client.table("Supply_Relationships").select("supplier_company_id").eq("buyer_company_id", buyer_id).eq("is_active", True).execute()
+        supplier_ids = [r["supplier_company_id"] for r in rels.data]
+        
+        if not supplier_ids:
+            return {"status": "success", "data": []}
+            
+        # Step 2: Get company details (bypassing RLS with service_role)
+        vendors = sb_client.table("Companies_and_Vendors").select("*").in_("id", supplier_ids).execute()
+        return {"status": "success", "data": vendors.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

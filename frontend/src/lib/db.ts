@@ -231,31 +231,31 @@ export async function getMyVendors(optionalCompanyId?: string): Promise<CompanyR
     let companyId = optionalCompanyId;
     if (!companyId) {
         const company = await getMyCompany();
-        if (!company) return [];
+        if (!company) {
+            console.log('[DEBUG getMyVendors] No company returned from getMyCompany()');
+            return [];
+        }
         companyId = company.id;
     }
-
-    // Step 1: Find all supplier IDs linked to this buyer
-    const { data: rels, error: relError } = await supabase
-        .from('Supply_Relationships')
-        .select('supplier_company_id')
-        .eq('buyer_company_id', companyId)
-        .eq('is_active', true);
-
-    if (relError) { console.error('getMyVendors relations error:', relError); return []; }
-    if (!rels || rels.length === 0) return [];
     
-    const supplierIds = rels.map(r => r.supplier_company_id);
+    console.log(`[DEBUG getMyVendors] Fetching vendors for Buyer Company ID: ${companyId}`);
 
-    // Step 2: Fetch the actual company details for those suppliers
-    const { data: vendors, error: venError } = await supabase
-        .from('Companies_and_Vendors')
-        .select('*')
-        .in('id', supplierIds);
+    try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const res = await fetch(`${backendUrl}/api/vendors?buyer_id=${companyId}`);
+        
+        if (!res.ok) {
+            console.error('[DEBUG getMyVendors] Backend returned an error:', res.status);
+            return [];
+        }
 
-    if (venError) { console.error('getMyVendors details error:', venError); return []; }
-    
-    return vendors ?? [];
+        const json = await res.json();
+        console.log(`[DEBUG getMyVendors] Successfully fetched ${json.data?.length} vendors from backend API`);
+        return json.data || [];
+    } catch (err) {
+        console.error('[DEBUG getMyVendors] Fetch Error:', err);
+        return [];
+    }
 }
 
 /** Get industry averages for Smart Switch. */
