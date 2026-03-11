@@ -235,22 +235,27 @@ export async function getMyVendors(optionalCompanyId?: string): Promise<CompanyR
         companyId = company.id;
     }
 
-    // Correct Supabase Join syntax for disambiguating multiple foreign keys
-    const { data, error } = await supabase
+    // Step 1: Find all supplier IDs linked to this buyer
+    const { data: rels, error: relError } = await supabase
         .from('Supply_Relationships')
-        .select(`
-            supplier_company_id,
-            Companies_and_Vendors!supplier_company_id (*)
-        `)
+        .select('supplier_company_id')
         .eq('buyer_company_id', companyId)
         .eq('is_active', true);
 
-    if (error) { console.error('getMyVendors error:', error); return []; }
+    if (relError) { console.error('getMyVendors relations error:', relError); return []; }
+    if (!rels || rels.length === 0) return [];
     
-    // Extract the actual company rows from the join
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const vendors = (data ?? []).map((r: any) => r.Companies_and_Vendors).filter(Boolean);
-    return vendors;
+    const supplierIds = rels.map(r => r.supplier_company_id);
+
+    // Step 2: Fetch the actual company details for those suppliers
+    const { data: vendors, error: venError } = await supabase
+        .from('Companies_and_Vendors')
+        .select('*')
+        .in('id', supplierIds);
+
+    if (venError) { console.error('getMyVendors details error:', venError); return []; }
+    
+    return vendors ?? [];
 }
 
 /** Get industry averages for Smart Switch. */
