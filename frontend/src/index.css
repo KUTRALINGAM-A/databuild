@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142.1 70.6% 45.3%;
+    --primary-foreground: 144.9 80.4% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 142.1 70.6% 45.3%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply antialiased selection:bg-eco-mint/30 selection:text-eco-deepgreen;
+    overflow-x: hidden;
+    background-color: theme('colors.eco.basegray');
+    color: theme('colors.eco.graphite');
+    /* Subtle light gradient background inspired by nature */
+    background-image: 
+      radial-gradient(circle at 15% 50%, rgba(64, 145, 108, 0.05), transparent 25%),
+      radial-gradient(circle at 85% 30%, rgba(45, 106, 79, 0.05), transparent 25%);
+  }
+}
+
+/* Light Glassmorphism helpers */
+.glass-panel {
+  @apply bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_8px_30px_rgba(45,49,66,0.06)];
+  border-radius: 1.25rem;
+}
+
+.glow-text {
+  text-shadow: 0 0 20px rgba(74, 222, 128, 0.5);
+}

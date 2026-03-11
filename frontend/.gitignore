@@ -22,9 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Remote adds
-venv/
-.env
-__pycache__/
-*.pem
