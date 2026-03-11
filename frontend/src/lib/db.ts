@@ -126,14 +126,18 @@ export async function createCompany(params: {
 // ─── Carbon Ledger helpers ────────────────────────────────────────────────────
 
 /** Fetch all carbon ledger rows for the current user's company. */
-export async function getMyCarbonLedger(): Promise<CarbonLedgerRow[]> {
-    const company = await getMyCompany();
-    if (!company) return [];
+export async function getMyCarbonLedger(optionalCompanyId?: string): Promise<CarbonLedgerRow[]> {
+    let companyId = optionalCompanyId;
+    if (!companyId) {
+        const company = await getMyCompany();
+        if (!company) return [];
+        companyId = company.id;
+    }
 
     const { data, error } = await supabase
         .from('Carbon_Ledger')
         .select('*')
-        .eq('company_id', company.id)
+        .eq('company_id', companyId)
         .order('date_recorded', { ascending: false });
 
     if (error) { console.error('getMyCarbonLedger error:', error); return []; }
@@ -223,9 +227,13 @@ export async function saveUploadRecord(params: {
 }
 
 /** Get all vendors for the current user's company. */
-export async function getMyVendors(): Promise<CompanyRow[]> {
-    const company = await getMyCompany();
-    if (!company) return [];
+export async function getMyVendors(optionalCompanyId?: string): Promise<CompanyRow[]> {
+    let companyId = optionalCompanyId;
+    if (!companyId) {
+        const company = await getMyCompany();
+        if (!company) return [];
+        companyId = company.id;
+    }
 
     const { data, error } = await supabase
         .from('Companies_and_Vendors')

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Leaf, ArrowRight, Eye, EyeOff, Building2, Mail, Lock, CheckCircle2, Loader2, TrendingDown, Globe, Users, Zap } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Building2, Mail, Lock, CheckCircle2, Loader2, TrendingDown, Globe, Users, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { createCompany } from '@/lib/db';
 
@@ -173,9 +173,8 @@ export function AuthPage() {
 
                 {/* Logo */}
                 <div className="relative z-10 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
-                        style={{ background: 'linear-gradient(135deg, #40916C, #2D6A4F)' }}>
-                        <Leaf className="w-5 h-5 text-white" />
+                    <div className="bg-[#F0F2F5] rounded-xl p-1.5 shadow-lg flex items-center justify-center">
+                        <img src="/logo.png" alt="EcoLedger Logo" className="w-10 h-10 object-contain drop-shadow-[0_4px_10px_rgba(64,145,108,0.4)]" />
                     </div>
                     <span className="text-white text-xl font-bold tracking-tight">
                         EcoLedger<span style={{ color: '#D9A06F' }}>.</span>
@@ -238,10 +237,7 @@ export function AuthPage() {
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
                 {/* Mobile logo */}
                 <div className="lg:hidden flex items-center gap-2 mb-8">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #40916C, #1B4332)' }}>
-                        <Leaf className="w-4 h-4 text-white" />
-                    </div>
+                    <img src="/logo.png" alt="EcoLedger Logo" className="w-10 h-10 object-contain drop-shadow-md" />
                     <span className="text-xl font-bold" style={{ color: '#1B4332' }}>EcoLedger.</span>
                 </div>
 

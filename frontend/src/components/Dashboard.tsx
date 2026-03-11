@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Leaf, RefreshCw } from 'lucide-react';
+import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getMyCompany, getMyCarbonLedger, getMyVendors, getIndustryAverages } from '@/lib/db';
 import type { CompanyRow, CarbonLedgerRow, IndustryAverageRow } from '@/lib/db';
@@ -26,12 +26,21 @@ export function Dashboard() {
 
     const load = async () => {
         setLoading(true);
-        const [co, led, ven, avgs] = await Promise.all([
-            getMyCompany(),
-            getMyCarbonLedger(),
-            getMyVendors(),
+        
+        // 1) Fetch user's company first to avoid duplicating database `getUser()` auth checks
+        const co = await getMyCompany();
+        if (!co) {
+            setLoading(false);
+            return;
+        }
+
+        // 2) Fetch the rest of the data safely without hitting N+1 getMyCompany calls
+        const [led, ven, avgs] = await Promise.all([
+            getMyCarbonLedger(co.id),
+            getMyVendors(co.id),
             getIndustryAverages(),
         ]);
+
         setCompany(co);
         setLedger(led);
         setVendors(ven.length > 0 ? ven : MOCK_VENDORS);
@@ -61,8 +70,8 @@ export function Dashboard() {
     if (loading) return (
         <div className="w-full max-w-6xl mx-auto flex items-center justify-center py-32">
             <div className="flex flex-col items-center gap-3">
-                <div className="w-10 h-10 border-2 border-green-500/30 border-t-green-500 rounded-full animate-spin" />
-                <p className="text-zinc-400 text-sm">Loading your carbon data…</p>
+                <div className="w-10 h-10 border-2 border-eco-mint/30 border-t-eco-mint rounded-full animate-spin" />
+                <p className="text-eco-graphite/60 text-sm font-medium">Loading your carbon data…</p>
             </div>
         </div>
     );
@@ -74,10 +83,10 @@ export function Dashboard() {
             {company && (
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-2xl font-bold text-white">{company.name}</h2>
-                        <p className="text-zinc-500 text-sm">{company.industry} · Carbon Cap: {carbonCap.toLocaleString()} kg CO₂e / year</p>
+                        <h2 className="text-2xl font-bold text-eco-deepgreen">{company.name}</h2>
+                        <p className="text-eco-graphite/70 text-sm">{company.industry} · Carbon Cap: {carbonCap.toLocaleString()} kg CO₂e / year</p>
                     </div>
-                    <button onClick={load} className="p-2 rounded-full border border-zinc-700 text-zinc-400 hover:text-white transition">
+                    <button onClick={load} className="p-2 rounded-full border border-eco-graphite/20 text-eco-graphite/60 hover:text-eco-deepgreen hover:bg-white transition bg-white/50">
                         <RefreshCw className="w-4 h-4" />
                     </button>
                 </div>
@@ -91,39 +100,39 @@ export function Dashboard() {
 
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 relative z-10 space-y-2 md:space-y-0">
                         <div>
-                            <span className="text-sm font-semibold text-zinc-300 block mb-1">Dynamic Carbon Cap Limit (PAT Scheme)</span>
+                            <span className="text-sm font-bold text-eco-deepgreen block mb-1">Dynamic Carbon Cap Limit (PAT Scheme)</span>
                             {company.production_volume ? (
-                                <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                                    <span className="bg-zinc-800 px-2 py-1 border border-zinc-700 rounded-md shadow-sm">{company.production_volume.toLocaleString()} {company.production_unit}</span>
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-eco-graphite/70">
+                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">{company.production_volume.toLocaleString()} {company.production_unit}</span>
                                     <span>×</span>
-                                    <span className="bg-zinc-800 px-2 py-1 border border-zinc-700 rounded-md shadow-sm">{company.industry_emission_factor} kg/unit (Benchmark)</span>
+                                    <span className="bg-white px-2 py-1 border border-eco-graphite/10 rounded-md shadow-sm">{company.industry_emission_factor} kg/unit (Benchmark)</span>
                                     <span>=</span>
-                                    <span className="text-zinc-300 font-medium">{carbonCap.toLocaleString()} kg CO₂e Allowed</span>
+                                    <span className="text-eco-deepgreen font-bold">{carbonCap.toLocaleString()} kg CO₂e Allowed</span>
                                 </div>
                             ) : (
-                                <span className="text-xs text-zinc-500">Fixed limit configuration</span>
+                                <span className="text-xs text-eco-graphite/70">Fixed limit configuration</span>
                             )}
                         </div>
                         <span className={cn("px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-md",
                             capPercent >= 100 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                capPercent >= 80 ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                                    'bg-green-500/20 text-green-400 border border-green-500/30')}>
+                                capPercent >= 80 ? 'bg-eco-ochre/20 text-eco-ochre border border-eco-ochre/30' :
+                                    'bg-eco-mint/20 text-eco-mint border border-eco-mint/30')}>
                             {capPercent.toFixed(1)}% Capacity Used
                         </span>
                     </div>
 
-                    <div className="h-3 bg-zinc-900/80 rounded-full overflow-hidden border border-zinc-800/50 shadow-inner relative z-10">
+                    <div className="h-3 bg-white/60 rounded-full overflow-hidden border border-eco-graphite/10 shadow-inner relative z-10">
                         <div
-                            className={cn("h-full rounded-full transition-all duration-1000 ease-out shadow-[inset_0_2px_4px_rgba(255,255,255,0.3)]",
+                            className={cn("h-full rounded-full transition-all duration-1000 ease-out shadow-[inset_0_1px_2px_rgba(255,255,255,0.4)]",
                                 capPercent >= 100 ? "bg-gradient-to-r from-red-600 to-red-400" :
-                                    capPercent >= 80 ? "bg-gradient-to-r from-yellow-600 to-yellow-400" :
-                                        "bg-gradient-to-r from-emerald-600 to-green-400")}
+                                    capPercent >= 80 ? "bg-gradient-to-r from-eco-ochre to-yellow-400" :
+                                        "bg-gradient-to-r from-eco-deepgreen to-eco-mint")}
                             style={{ width: `${capPercent}%` }}
                         />
                     </div>
-                    <div className="flex justify-between text-[11px] font-medium text-zinc-500 mt-2 relative z-10">
+                    <div className="flex justify-between text-[11px] font-medium text-eco-graphite/70 mt-2 relative z-10">
                         <span>0 kg</span>
-                        <span className={capPercent >= 100 ? "text-red-400" : ""}>{totalCo2e.toLocaleString()} kg Emitted</span>
+                        <span className={capPercent >= 100 ? "text-red-500 font-bold" : ""}>{totalCo2e.toLocaleString()} kg Emitted</span>
                         <span>{carbonCap.toLocaleString()} kg Limit</span>
                     </div>
                 </div>
@@ -135,26 +144,26 @@ export function Dashboard() {
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Activity className="w-24 h-24" />
                     </div>
-                    <p className="text-zinc-400 font-medium mb-1 relative z-10">My Footprint (Scope 1+2)</p>
-                    <h3 className="text-4xl font-bold text-white relative z-10">
+                    <p className="text-eco-graphite/60 font-medium mb-1 relative z-10">My Footprint (Scope 1+2)</p>
+                    <h3 className="text-4xl font-bold text-eco-deepgreen relative z-10">
                         {totalCo2e > 0 ? totalCo2e.toLocaleString() : '—'}
-                        <span className="text-lg text-zinc-500 font-normal"> kg CO₂e</span>
+                        <span className="text-lg text-eco-graphite/60 font-medium"> kg CO₂e</span>
                     </h3>
-                    <div className="mt-4 flex items-center space-x-2 text-sm text-green-400 bg-green-400/10 w-max px-3 py-1 rounded-full border border-green-500/20 relative z-10">
+                    <div className="mt-4 flex items-center space-x-2 text-sm text-eco-mint bg-eco-mint/10 w-max px-3 py-1 rounded-full border border-eco-mint/20 relative z-10">
                         <Activity className="w-4 h-4" /><span>{ledger.length} records tracked</span>
                     </div>
                 </div>
 
                 <div className="glass-panel p-6 rounded-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Zap className="w-24 h-24 text-yellow-500" />
+                        <Zap className="w-24 h-24 text-eco-ochre" />
                     </div>
-                    <p className="text-zinc-400 font-medium mb-1 relative z-10">Energy Consumption</p>
-                    <h3 className="text-4xl font-bold text-white relative z-10">
+                    <p className="text-eco-graphite/60 font-medium mb-1 relative z-10">Energy Consumption</p>
+                    <h3 className="text-4xl font-bold text-eco-deepgreen relative z-10">
                         {energyCo2e > 0 ? energyCo2e.toLocaleString() : '—'}
-                        <span className="text-lg text-zinc-500 font-normal"> kWh</span>
+                        <span className="text-lg text-eco-graphite/60 font-medium"> kWh</span>
                     </h3>
-                    <div className="mt-4 flex items-center space-x-2 text-sm text-yellow-400 bg-yellow-400/10 w-max px-3 py-1 rounded-full border border-yellow-500/20 relative z-10">
+                    <div className="mt-4 flex items-center space-x-2 text-sm text-eco-ochre bg-eco-ochre/10 w-max px-3 py-1 rounded-full border border-eco-ochre/20 relative z-10">
                         <Zap className="w-4 h-4" /><span>Scope 2 from uploads</span>
                     </div>
                 </div>
@@ -163,13 +172,13 @@ export function Dashboard() {
                     <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-red-500">
                         <Factory className="w-24 h-24" />
                     </div>
-                    <p className="text-zinc-400 font-medium mb-1 relative z-10">Supply Chain (Scope 3)</p>
-                    <h3 className="text-4xl font-bold text-white relative z-10">
+                    <p className="text-eco-graphite/60 font-medium mb-1 relative z-10">Supply Chain (Scope 3)</p>
+                    <h3 className="text-4xl font-bold text-eco-deepgreen relative z-10">
                         {scope3Co2e.toLocaleString()}
-                        <span className="text-lg text-zinc-500 font-normal"> kg CO₂e</span>
+                        <span className="text-lg text-eco-graphite/60 font-medium"> kg CO₂e</span>
                     </h3>
                     <div className={cn("mt-4 flex items-center space-x-2 text-sm w-max px-3 py-1 rounded-full border relative z-10",
-                        breachCount > 0 ? "text-red-400 bg-red-400/10 border-red-500/20" : "text-green-400 bg-green-400/10 border-green-500/20")}>
+                        breachCount > 0 ? "text-red-400 bg-red-400/10 border-red-500/20" : "text-eco-mint bg-eco-mint/10 border-eco-mint/20")}>
                         <AlertTriangle className="w-4 h-4" />
                         <span>{breachCount > 0 ? `${breachCount} Vendor${breachCount > 1 ? 's' : ''} Above Cap` : 'All Vendors Compliant'}</span>
                     </div>
@@ -182,11 +191,11 @@ export function Dashboard() {
                 <div className="lg:col-span-2 glass-panel rounded-2xl p-6 sm:p-8">
                     <div className="flex justify-between items-end mb-6">
                         <div>
-                            <h3 className="text-xl font-bold text-white mb-1">Supply Chain Nodes</h3>
-                            <p className="text-sm text-zinc-400">Track carbon scores of registered vendors.</p>
+                            <h3 className="text-xl font-bold text-eco-deepgreen mb-1">Supply Chain Nodes</h3>
+                            <p className="text-sm text-eco-graphite/70">Track carbon scores of registered vendors.</p>
                         </div>
                         <div className="flex space-x-4 text-sm font-medium">
-                            <span className="flex items-center text-green-400"><span className="w-2 h-2 rounded-full bg-green-500 mr-2 shadow-[0_0_8px_rgba(34,197,94,0.8)]" /> Compliant</span>
+                            <span className="flex items-center text-eco-mint"><span className="w-2 h-2 rounded-full bg-eco-mint mr-2 shadow-[0_0_8px_rgba(64,145,108,0.8)]" /> Compliant</span>
                             <span className="flex items-center text-red-400"><span className="w-2 h-2 rounded-full bg-red-500 mr-2 shadow-[0_0_8px_rgba(239,68,68,0.8)] animate-pulse" /> Breach</span>
                         </div>
                     </div>
@@ -198,33 +207,33 @@ export function Dashboard() {
                                 onClick={() => vendor.status === 'Red' && setSelectedRedVendor(vendor)}
                                 className={cn(
                                     "p-4 rounded-xl border flex flex-wrap sm:flex-nowrap justify-between items-center transition-all duration-300 relative overflow-hidden group",
-                                    vendor.status === 'Red' ? "border-red-900/50 bg-red-950/20 cursor-pointer hover:bg-red-900/30 hover:shadow-[0_0_20px_rgba(220,38,38,0.2)]" : "border-zinc-800 bg-zinc-800/20"
+                                    vendor.status === 'Red' ? "border-eco-ochre/30 bg-eco-ochre/5 cursor-pointer hover:bg-eco-ochre/10 hover:shadow-[0_4px_20px_rgba(217,160,111,0.15)]" : "border-eco-graphite/10 bg-white/40"
                                 )}
                             >
                                 <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500",
-                                    vendor.status === 'Red' ? "bg-gradient-to-r from-red-600 to-transparent" : "bg-gradient-to-r from-zinc-600 to-transparent"
+                                    vendor.status === 'Red' ? "bg-gradient-to-r from-eco-ochre/50 to-transparent" : "bg-gradient-to-r from-eco-basegray to-transparent"
                                 )} />
 
                                 <div className="w-full sm:w-auto mb-4 sm:mb-0 relative z-10">
                                     <div className="flex items-center space-x-3 mb-1">
                                         <div className={cn("w-2.5 h-2.5 rounded-full shadow-[0_0_8px_currentColor]",
-                                            vendor.status === 'Green' ? "text-green-500 bg-green-500" : "text-red-500 bg-red-500 animate-pulse"
+                                            vendor.status === 'Green' ? "text-eco-mint bg-eco-mint" : "text-red-500 bg-red-500 animate-pulse"
                                         )} />
-                                        <h4 className="font-semibold text-lg text-zinc-100">{vendor.name}</h4>
+                                        <h4 className="font-semibold text-lg text-eco-deepgreen">{vendor.name}</h4>
                                     </div>
-                                    <p className="text-sm text-zinc-500 ml-5">{vendor.industry}</p>
+                                    <p className="text-sm text-eco-graphite/70 ml-5">{vendor.industry}</p>
                                 </div>
 
                                 <div className="flex items-center space-x-8 relative z-10">
                                     <div className="text-right">
-                                        <p className="text-xs text-zinc-500 mb-1 uppercase tracking-wider">Carbon Emitted</p>
-                                        <p className={cn("font-bold text-lg", vendor.status === 'Red' ? "text-red-400" : "text-zinc-200")}>
-                                            {(vendor.total_co2e ?? 0).toLocaleString()} <span className="text-xs font-normal opacity-70">kg</span>
+                                        <p className="text-xs font-semibold text-eco-graphite/60 mb-1 uppercase tracking-wider">Carbon Emitted</p>
+                                        <p className={cn("font-bold text-lg", vendor.status === 'Red' ? "text-eco-ochre" : "text-eco-teal")}>
+                                            {(vendor.total_co2e ?? 0).toLocaleString()} <span className="text-xs font-medium opacity-70">kg</span>
                                         </p>
                                     </div>
                                     <div className="text-right hidden sm:block">
-                                        <p className="text-xs text-zinc-500 mb-1 uppercase tracking-wider">Carbon Cap</p>
-                                        <p className="font-bold text-lg text-zinc-200">{vendor.carbon_cap.toLocaleString()} <span className="text-xs font-normal opacity-70">kg</span></p>
+                                        <p className="text-xs font-semibold text-eco-graphite/60 mb-1 uppercase tracking-wider">Carbon Cap</p>
+                                        <p className="font-bold text-lg text-eco-teal">{vendor.carbon_cap.toLocaleString()} <span className="text-xs font-medium opacity-70">kg</span></p>
                                     </div>
                                 </div>
 
@@ -239,66 +248,66 @@ export function Dashboard() {
                 </div>
 
                 {/* Smart Switch */}
-                <div className="glass-panel rounded-2xl p-6 sm:p-8 flex flex-col h-full border-zinc-700/50 shadow-[0_0_40px_rgba(0,0,0,0.5)]">
+                <div className="glass-panel rounded-2xl p-6 sm:p-8 flex flex-col h-full border-eco-graphite/10 shadow-xl overflow-hidden">
                     <div className="flex items-center space-x-3 mb-6">
-                        <div className="p-2 bg-gradient-to-br from-green-400 to-emerald-600 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.4)]">
+                        <div className="p-2 bg-gradient-to-br from-eco-mint to-eco-deepgreen rounded-lg shadow-[0_4px_15px_rgba(64,145,108,0.2)]">
                             <ShieldCheck className="w-6 h-6 text-white" />
                         </div>
-                        <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-500">
+                        <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-eco-mint to-eco-teal">
                             Smart Switch Engine
                         </h3>
                     </div>
 
                     {!selectedRedVendor ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 py-12">
-                            <div className="w-16 h-16 rounded-full bg-zinc-800/50 flex items-center justify-center border border-zinc-700">
-                                <AlertTriangle className="w-8 h-8 text-zinc-600" />
+                            <div className="w-16 h-16 rounded-full bg-eco-basegray flex items-center justify-center border border-eco-graphite/10 shadow-inner">
+                                <AlertTriangle className="w-8 h-8 text-eco-graphite/40" />
                             </div>
-                            <p className="text-zinc-400 text-sm max-w-[250px]">
+                            <p className="text-eco-graphite/70 text-sm max-w-[250px] font-medium">
                                 Select a non-compliant vendor to view greener, verified alternatives in their industry.
                             </p>
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 fade-in duration-300">
-                            <div className="mb-6 p-4 rounded-xl bg-red-950/30 border border-red-900/50 text-sm">
-                                <span className="text-red-400 font-semibold block mb-1">Breach Detected</span>
-                                <span className="text-zinc-300">
+                            <div className="mb-6 p-4 rounded-xl bg-eco-ochre/10 border border-eco-ochre/30 text-sm">
+                                <span className="text-eco-ochre font-bold block mb-1">Breach Detected</span>
+                                <span className="text-eco-graphite font-medium">
                                     {selectedRedVendor.name} is {(((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap) / selectedRedVendor.carbon_cap * 100).toFixed(1)}% above their carbon cap.
                                 </span>
                             </div>
 
-                            <h4 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Recommended Actions</h4>
+                            <h4 className="text-sm font-bold text-eco-graphite/60 uppercase tracking-wider mb-4">Recommended Actions</h4>
 
                             <div className="space-y-4 flex-1">
                                 {(industryAvgs.length > 0 ? getAlternatives(selectedRedVendor) : MOCK_ALTERNATIVES).map((alt, i) => (
-                                    <div key={i} className="p-4 rounded-xl border border-green-900/30 bg-green-950/10 hover:bg-green-900/20 hover:border-green-500/50 transition-all cursor-pointer group">
+                                    <div key={i} className="p-4 rounded-xl border border-eco-teal/30 bg-white/50 hover:bg-white/80 hover:border-eco-mint/50 transition-all cursor-pointer shadow-sm group">
                                         <div className="flex justify-between items-start mb-2">
-                                            <h5 className="font-semibold text-green-100 group-hover:text-green-300 transition-colors">Switch to {alt.name}</h5>
-                                            <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded font-bold border border-green-500/30">-{alt.reduction}</span>
+                                            <h5 className="font-bold text-eco-deepgreen group-hover:text-eco-teal transition-colors">Switch to {alt.name}</h5>
+                                            <span className="bg-eco-mint/20 text-eco-deepgreen text-xs px-2 py-1 rounded font-bold border border-eco-mint/30">-{alt.reduction}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-sm">
-                                            <span className="text-zinc-500">Emissions Avg:</span>
-                                            <span className="font-medium text-green-200">{alt.co2e.toLocaleString()} kg</span>
+                                            <span className="text-eco-graphite/60">Emissions Avg:</span>
+                                            <span className="font-bold text-eco-teal">{alt.co2e.toLocaleString()} kg</span>
                                         </div>
                                     </div>
                                 ))}
 
-                                <div className="p-4 rounded-xl border border-emerald-900/30 bg-emerald-950/10 hover:bg-emerald-900/20 hover:border-emerald-500/50 transition-all cursor-pointer group">
+                                <div className="p-4 rounded-xl border border-eco-teal/40 bg-eco-teal/5 hover:bg-eco-teal/10 hover:border-eco-mint/70 transition-all cursor-pointer shadow-sm group">
                                     <div className="flex justify-between items-start mb-2">
-                                        <h5 className="font-semibold text-emerald-100 group-hover:text-emerald-300 transition-colors flex items-center gap-2">
-                                            <Leaf className="w-4 h-4 text-emerald-400" />
+                                        <h5 className="font-bold text-eco-deepgreen group-hover:text-eco-teal transition-colors flex items-center gap-2">
+                                            <Sprout className="w-4 h-4 text-eco-mint" />
                                             Buy Carbon Credits via CCTS
                                         </h5>
-                                        <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded font-bold border border-emerald-500/30">Offset Breach</span>
+                                        <span className="bg-eco-mint/20 text-eco-deepgreen text-xs px-2 py-1 rounded font-bold border border-eco-mint/30">Offset Breach</span>
                                     </div>
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-zinc-500">Cost to clear {((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap).toLocaleString()} kg:</span>
-                                        <span className="font-medium text-emerald-200">₹{(((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap) * 4.17).toFixed(0)}</span>
+                                        <span className="text-eco-graphite/60">Cost to clear {((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap).toLocaleString()} kg:</span>
+                                        <span className="font-bold text-eco-teal">₹{(((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap) * 4.17).toFixed(0)}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <button className="mt-6 w-full py-3 bg-zinc-100 text-zinc-900 font-bold justify-center rounded-xl flex items-center space-x-2 hover:bg-white transition-colors">
+                            <button className="mt-6 w-full py-3 bg-eco-deepgreen text-white font-bold justify-center rounded-xl flex items-center space-x-2 shadow-md hover:bg-eco-teal transition-colors">
                                 <span>Take Action</span>
                                 <ArrowRight className="w-4 h-4" />
                             </button>
