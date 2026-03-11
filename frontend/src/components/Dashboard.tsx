@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw, FileText, Network, Box } from 'lucide-react';
+import { Activity, Zap, Factory, AlertTriangle, ArrowRight, ShieldCheck, Sprout, RefreshCw, FileText, Network, Box, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getMyCompany, getMyCarbonLedger, getMyVendors, getIndustryAverages } from '@/lib/db';
-import type { CompanyRow, CarbonLedgerRow, IndustryAverageRow } from '@/lib/db';
+import { getMyCompany, getMyCarbonLedger, getMyVendors, getRecommendations } from '@/lib/db';
+import type { CompanyRow, CarbonLedgerRow } from '@/lib/db';
 import { useNavigate } from 'react-router-dom';
-
+import { ReportGenerator } from './ReportGenerator';
 
 export function Dashboard() {
     const navigate = useNavigate();
     const [company, setCompany] = useState<CompanyRow | null>(null);
     const [ledger, setLedger] = useState<CarbonLedgerRow[]>([]);
     const [vendors, setVendors] = useState<CompanyRow[]>([]);
-    const [industryAvgs, setIndustryAvgs] = useState<IndustryAverageRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedRedVendor, setSelectedRedVendor] = useState<CompanyRow | null>(null);
+    const [recommendations, setRecommendations] = useState<CompanyRow[]>([]);
+    const [loadingRecs, setLoadingRecs] = useState(false);
 
     const load = async () => {
         setLoading(true);
@@ -26,16 +27,14 @@ export function Dashboard() {
         }
 
         // 2) Fetch the rest of the data safely without hitting N+1 getMyCompany calls
-        const [led, ven, avgs] = await Promise.all([
+        const [led, ven] = await Promise.all([
             getMyCarbonLedger(co.id),
             getMyVendors(co.id),
-            getIndustryAverages(),
         ]);
 
         setCompany(co);
         setLedger(led);
         setVendors(ven);
-        setIndustryAvgs(avgs);
         setLoading(false);
     };
 
@@ -55,14 +54,29 @@ export function Dashboard() {
         : (company?.carbon_cap ?? 10000);
     const rawCapPercent = (grandTotalCo2e / dynamicCap) * 100;
 
-    // Smart Switch alternatives pulled from industry averages
-    const getAlternatives = (vendor: CompanyRow) => {
-        const industryCap = industryAvgs.find(a => a.industry === vendor.industry)?.avg_co2e ?? 8000;
-        return [
-            { name: `Eco-${vendor.industry} Partner A`, co2e: Math.round(industryCap * 0.75), reduction: '25%' },
-            { name: `Green${vendor.industry} Ltd.`, co2e: Math.round(industryCap * 0.85), reduction: '15%' },
-        ];
-    };
+    // Smart Switch alternatives pulled from live database
+    useEffect(() => {
+        if (!selectedRedVendor) {
+            setRecommendations([]);
+            return;
+        }
+        
+        const fetchRecs = async () => {
+            setLoadingRecs(true);
+            
+            // Pass company (buyer) ID so the backend excludes existing supply chain members.
+            // Also pass the breaching vendor's ID directly to exclude it from its own recommendations.
+            const recs = await getRecommendations(
+                selectedRedVendor.supplied_product_id ?? '',
+                company?.id,
+                selectedRedVendor.id
+            );
+            setRecommendations(recs);
+            setLoadingRecs(false);
+        };
+        
+        fetchRecs();
+    }, [selectedRedVendor]);
 
     if (loading) return (
         <div className="w-full max-w-6xl mx-auto flex items-center justify-center py-32">
@@ -105,6 +119,16 @@ export function Dashboard() {
                             <Box className="w-4 h-4" />
                             Add Product
                         </button>
+                        <ReportGenerator
+                            company={company}
+                            ledger={ledger}
+                            vendors={vendors}
+                            dynamicCap={dynamicCap}
+                            grandTotalCo2e={grandTotalCo2e}
+                            scope12Co2e={scope12Co2e}
+                            scope3Co2e={scope3Co2e}
+                            energyCo2e={energyCo2e}
+                        />
                         <button onClick={load} className="p-2 rounded-xl border border-eco-graphite/20 text-eco-graphite/60 hover:text-eco-deepgreen hover:bg-white/50 transition bg-white/30">
                             <RefreshCw className="w-4 h-4" />
                         </button>
@@ -254,7 +278,14 @@ export function Dashboard() {
                                             )} />
                                             <h4 className="font-semibold text-lg text-eco-deepgreen">{vendor.name}</h4>
                                         </div>
-                                        <p className="text-sm text-eco-graphite/70 ml-5">{vendor.industry}</p>
+                                        <div className="flex items-center gap-2 ml-5">
+                                            <p className="text-sm text-eco-graphite/70">{vendor.industry}</p>
+                                            {vendor.supplied_product_name && (
+                                                <span className="text-xs bg-eco-deepgreen/10 text-eco-deepgreen font-semibold px-2 py-0.5 rounded-full border border-eco-deepgreen/20">
+                                                    📦 {vendor.supplied_product_name}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center space-x-8 relative z-10">
@@ -298,33 +329,60 @@ export function Dashboard() {
                                 <AlertTriangle className="w-8 h-8 text-eco-graphite/40" />
                             </div>
                             <p className="text-eco-graphite/70 text-sm max-w-[250px] font-medium">
-                                Select a non-compliant vendor to view greener, verified alternatives in their industry.
+                                Select a non-compliant vendor to find verified Green alternatives supplying the <strong>same product</strong>.
                             </p>
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col animate-in slide-in-from-right-4 fade-in duration-300">
                             <div className="mb-6 p-4 rounded-xl bg-eco-ochre/10 border border-eco-ochre/30 text-sm">
                                 <span className="text-eco-ochre font-bold block mb-1">Breach Detected</span>
-                                <span className="text-eco-graphite font-medium">
+                                <span className="text-eco-graphite font-medium block">
                                     {selectedRedVendor.name} is {(((selectedRedVendor.total_co2e ?? 0) - selectedRedVendor.carbon_cap) / selectedRedVendor.carbon_cap * 100).toFixed(1)}% above their carbon cap.
                                 </span>
+                                {selectedRedVendor.supplied_product_name && (
+                                    <span className="mt-2 inline-flex items-center gap-1 text-xs bg-eco-ochre/20 text-eco-ochre border border-eco-ochre/30 px-2 py-1 rounded-full font-semibold">
+                                        📦 Shopping for: {selectedRedVendor.supplied_product_name}
+                                    </span>
+                                )}
                             </div>
 
-                            <h4 className="text-sm font-bold text-eco-graphite/60 uppercase tracking-wider mb-4">Recommended Actions</h4>
+                                <h4 className="text-sm font-bold text-eco-graphite/60 uppercase tracking-wider mb-4">Recommended Actions</h4>
 
-                            <div className="space-y-4 flex-1">
-                                {getAlternatives(selectedRedVendor).map((alt, i) => (
-                                    <div key={i} className="p-4 rounded-xl border border-eco-teal/30 bg-white/50 hover:bg-white/80 hover:border-eco-mint/50 transition-all cursor-pointer shadow-sm group">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h5 className="font-bold text-eco-deepgreen group-hover:text-eco-teal transition-colors">Switch to {alt.name}</h5>
-                                            <span className="bg-eco-mint/20 text-eco-deepgreen text-xs px-2 py-1 rounded font-bold border border-eco-mint/30">-{alt.reduction}</span>
+                                <div className="space-y-4 flex-1">
+                                    {loadingRecs ? (
+                                        <div className="flex items-center justify-center p-8 space-x-3 bg-white/30 rounded-xl border border-eco-teal/20">
+                                            <Loader2 className="w-5 h-5 animate-spin text-eco-teal" />
+                                            <span className="text-eco-graphite/60 font-medium text-sm">Searching verified Green suppliers...</span>
                                         </div>
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="text-eco-graphite/60">Emissions Avg:</span>
-                                            <span className="font-bold text-eco-teal">{alt.co2e.toLocaleString()} kg</span>
+                                    ) : recommendations.length > 0 ? (
+                                        recommendations.map((alt) => {
+                                            const reductionPercent = (((selectedRedVendor.total_co2e ?? 0) - (alt.total_co2e ?? 0)) / (selectedRedVendor.total_co2e ?? 1) * 100).toFixed(0);
+                                            return (
+                                                <div key={alt.id} className="p-4 rounded-xl border border-eco-teal/30 bg-white/50 hover:bg-white/80 hover:border-eco-mint/50 transition-all cursor-pointer shadow-sm group">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h5 className="font-bold text-eco-deepgreen group-hover:text-eco-teal transition-colors">{alt.name}</h5>
+                                                        <span className="bg-eco-mint/20 text-eco-deepgreen text-xs px-2 py-1 rounded font-bold border border-eco-mint/30">-{reductionPercent}% CO₂e</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-xs text-eco-graphite/60">{alt.industry}</span>
+                                                        {selectedRedVendor.supplied_product_name && (
+                                                            <span className="text-xs bg-eco-deepgreen/10 text-eco-deepgreen font-semibold px-2 py-0.5 rounded-full border border-eco-deepgreen/20">
+                                                                📦 {selectedRedVendor.supplied_product_name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-eco-graphite/60">CO₂e Avg:</span>
+                                                        <span className="font-bold text-eco-teal">{(alt.total_co2e ?? 0).toLocaleString()} kg</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="p-4 rounded-xl border border-eco-ochre/30 bg-eco-ochre/5 text-eco-ochre text-sm font-medium text-center">
+                                            No verified Green suppliers found for this product yet.
                                         </div>
-                                    </div>
-                                ))}
+                                    )}
 
                                 <div className="p-4 rounded-xl border border-eco-teal/40 bg-eco-teal/5 hover:bg-eco-teal/10 hover:border-eco-mint/70 transition-all cursor-pointer shadow-sm group">
                                     <div className="flex justify-between items-start mb-2">

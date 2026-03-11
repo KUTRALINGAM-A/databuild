@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Loader2, Package, Building2, Hash, Weight, ToggleLeft, ToggleRight, ChevronDown } from 'lucide-react';
-import { getMyCompany } from '@/lib/db';
+import { ArrowRight, Loader2, Package, Building2, Hash, Weight, ToggleLeft, ToggleRight, ChevronDown, Copy, CheckCircle2 } from 'lucide-react';
+import { getMyCompany, getMyVendors } from '@/lib/db';
+import type { CompanyRow } from '@/lib/db';
 import { supabase } from '@/lib/supabase';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,6 +18,10 @@ export function SupplyRelationships() {
     // Auto-filled
     const [buyer_company_id, setBuyerCompanyId] = useState('');
     const [buyerName, setBuyerName] = useState('');
+    
+    // Existing vendors
+    const [vendors, setVendors] = useState<CompanyRow[]>([]);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     // Supplier dropdown
     const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -42,6 +47,10 @@ export function SupplyRelationships() {
             if (co) {
                 setBuyerCompanyId(co.id);
                 setBuyerName(co.name);
+                
+                // Fetch existing vendors
+                const v = await getMyVendors(co.id);
+                setVendors(v);
             }
 
             // Fetch all companies for supplier dropdown
@@ -135,6 +144,15 @@ export function SupplyRelationships() {
         }
     };
 
+    const copyMagicLink = (vendor: CompanyRow) => {
+        const baseUrl = window.location.origin;
+        const magicLink = `${baseUrl}/supplier-portal?buyer_id=${buyer_company_id}&vendor_id=${vendor.id}&buyer_name=${encodeURIComponent(buyerName)}`;
+        
+        navigator.clipboard.writeText(magicLink);
+        setCopiedId(vendor.id);
+        setTimeout(() => setCopiedId(null), 3000);
+    };
+
     const inputClass = "w-full bg-eco-basegray border border-gray-200 text-eco-graphite rounded-xl px-4 py-3 pl-11 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-eco-mint/50 focus:border-eco-mint transition-all duration-200";
 
     if (initialising) {
@@ -209,12 +227,14 @@ export function SupplyRelationships() {
 
             {/* ── RIGHT PANEL ── */}
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative overflow-y-auto">
-                <div className="w-full max-w-lg">
-                    <div className="bg-white rounded-3xl shadow-2xl shadow-black/8 border border-gray-100 p-8 md:p-10">
+                <div className="w-full max-w-6xl grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+                    
+                    {/* Column 1: Add Form */}
+                    <div className="bg-white rounded-3xl shadow-2xl shadow-black/8 border border-gray-100 p-8 md:p-10 w-full">
                         <div className="mb-8">
                             <h2 className="text-2xl font-black" style={{ color: '#1B4332' }}>Supply Relationship</h2>
                             <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
-                                Link a supplier to track your Scope 3 carbon impact.
+                                Link a new supplier to track your Scope 3 carbon impact.
                             </p>
                         </div>
 
@@ -377,6 +397,56 @@ export function SupplyRelationships() {
                             </button>
                         </form>
                     </div>
+
+                    {/* Column 2: Specific Tier-1 Vendors List with 1-Click Magic Links */}
+                    <div className="flex flex-col gap-4">
+                        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 xl:p-8">
+                            <h2 className="text-xl font-black mb-2" style={{ color: '#1B4332' }}>1-Click Supplier Collection</h2>
+                            <p className="text-sm text-gray-500 mb-6">
+                                The hardest part of Scope 3 reporting is getting data from Tier-1 suppliers. Generate a magic upload link for your suppliers. They drop their electricity bill, our OCR reads it, and it instantly syncs to your ledger—<strong>no login required</strong>.
+                            </p>
+                            
+                            <div className="space-y-3">
+                                {vendors.length === 0 ? (
+                                    <div className="p-4 rounded-xl border border-dashed border-gray-300 text-center flex flex-col items-center justify-center bg-gray-50/50">
+                                        <Building2 className="w-8 h-8 text-gray-300 mb-2" />
+                                        <p className="text-sm text-gray-400 font-medium">No active suppliers found</p>
+                                        <p className="text-xs text-gray-400 mt-1">Add a relationship on the left first.</p>
+                                    </div>
+                                ) : (
+                                    vendors.map(v => (
+                                        <div key={v.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-gray-100 shadow-sm bg-white hover:border-eco-mint/30 hover:shadow-md transition-all gap-4">
+                                            <div>
+                                                <h4 className="font-bold text-eco-graphite text-sm">{v.name}</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5">{(v as any).supplied_product_name || 'Materials'} Supplier</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                        v.status === 'Red' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'
+                                                    }`}>
+                                                        {v.status === 'Red' ? 'High Risk' : 'Compliant'}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 font-medium">ID: {v.id.substring(0,8)}</span>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => copyMagicLink(v)}
+                                                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                                                    copiedId === v.id 
+                                                        ? 'bg-eco-mint text-white shadow-md' 
+                                                        : 'bg-white border border-gray-200 text-eco-deepgreen hover:border-eco-mint hover:bg-eco-mint/5 shadow-sm'
+                                                }`}
+                                            >
+                                                {copiedId === v.id ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                {copiedId === v.id ? 'Link Copied!' : 'Copy Magic Link'}
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

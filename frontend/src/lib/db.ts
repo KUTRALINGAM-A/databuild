@@ -25,6 +25,8 @@ export type CompanyRow = {
     production_volume?: number;
     production_unit?: string;
     industry_emission_factor?: number;
+    supplied_product_id?: string;
+    supplied_product_name?: string;
 };
 
 export type CarbonLedgerRow = {
@@ -294,6 +296,28 @@ export async function getIndustryAverages(): Promise<IndustryAverageRow[]> {
         .select('*');
     if (error) return [];
     return data ?? [];
+}
+
+/** Get top performing Green companies that supply a specific product (for Smart Switch) */
+export async function getRecommendations(productId: string, buyerId?: string, excludeVendorId?: string): Promise<CompanyRow[]> {
+    try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        const params = new URLSearchParams({ product_id: productId });
+        if (buyerId) params.set('buyer_id', buyerId);
+        if (excludeVendorId) params.set('exclude_id', excludeVendorId);
+        const res = await fetch(`${backendUrl}/api/recommendations?${params.toString()}`);
+        
+        if (!res.ok) {
+            console.error('[DEBUG getRecommendations] Backend returned an error:', res.status);
+            return [];
+        }
+
+        const json = await res.json();
+        return json.data || [];
+    } catch (err) {
+        console.error('[DEBUG getRecommendations] Fetch Error:', err);
+        return [];
+    }
 }
 
 // ─── Products & Supply Chain helpers ─────────────────────────────────────────

@@ -1,13 +1,26 @@
-import os, supabase, pprint
+import os
 from dotenv import load_dotenv
+import supabase as sb
 
 load_dotenv(".env")
-client = supabase.create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
+client = sb.create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
-apex = client.table("Companies_and_Vendors").select("id").eq("name", "Apex Manufacturing").execute().data
-apex_id = apex[0]["id"]
-print("Apex ID:", apex_id)
+company = client.table("Companies_and_Vendors").select("*").eq("name", "Apex Manufacturing").execute().data
+if not company:
+    print("Apex not found")
+    exit()
 
-rels = client.table("Supply_Relationships").select("supplier_company_id, Companies_and_Vendors!supplier_company_id(*)").eq("buyer_company_id", apex_id).eq("is_active", True).execute().data
+cid = company[0]["id"]
+print(f"Company: {company[0]['name']} | ID: {cid}")
+print(f"Role: {company[0]['role']}")
+print(f"Status: {company[0]['status']}")
+print(f"Emissions: {company[0]['total_co2e']} / {company[0]['carbon_cap']}")
 
-pprint.pprint(rels)
+rels_as_supplier = client.table("Supply_Relationships").select("*").eq("supplier_company_id", cid).execute().data
+rels_as_buyer = client.table("Supply_Relationships").select("*").eq("buyer_company_id", cid).execute().data
+
+print(f"\nSupplies {len(rels_as_supplier)} buyers")
+print(f"Buys from {len(rels_as_buyer)} suppliers")
+
+ledger = client.table("Carbon_Ledger").select("*").eq("company_id", cid).execute().data
+print(f"\nLedger entries: {len(ledger)}")
